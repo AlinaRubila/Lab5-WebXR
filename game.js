@@ -1,113 +1,96 @@
-let currentLevel = 1;
+let scene = document.querySelector("a-scene");
 let container = document.querySelector("#levelContainer");
+let currentLevel = 1;
 
-let correctSound = new Audio("sounds/correct.mp3");
-let wrongSound = new Audio("sounds/wrong.mp3");
+scene.addEventListener("enter-vr", () => {
+  if (scene.is("ar-mode")) {
+    console.log("AR started");
+    loadLevel1();
+  }
+});
 
 function clearLevel() {
-    container.innerHTML = "";
+  container.innerHTML = "";
 }
 
 function nextLevel() {
-    currentLevel++;
-    if (currentLevel === 2) loadLevel2();
-    else if (currentLevel === 3) loadLevel3();
-    else alert("Поздравляем! Квест завершён 🎉");
+  currentLevel++;
+  if (currentLevel === 2) loadLevel2();
+  else if (currentLevel === 3) loadLevel3();
+  else alert("Квест завершён 🎉");
 }
 
-/* ===============================
-   УРОВЕНЬ 1 — Викторина
-=================================*/
 function loadLevel1() {
-    clearLevel();
-    document.getElementById("question").innerText =
-        "Какой цвет получается при смешении красного и синего?";
+  clearLevel();
+  document.getElementById("question").innerText =
+    "Какой цвет получается при смешении красного и синего?";
 
-    const answers = [
-        { color: "purple", correct: true, pos: "-1 0.5 -3" },
-        { color: "green", correct: false, pos: "0 0.5 -3" },
-        { color: "yellow", correct: false, pos: "1 0.5 -3" }
-    ];
+  const answers = [
+    { color: "purple", correct: true, pos: "-0.5 0 -2" },
+    { color: "green", correct: false, pos: "0.5 0 -2" },
+    { color: "yellow", correct: false, pos: "1.5 0 -2" }
+  ];
 
-    answers.forEach(a => {
-        let box = document.createElement("a-box");
-        box.setAttribute("color", a.color);
-        box.setAttribute("position", a.pos);
-        box.setAttribute("depth", "0.5");
+  answers.forEach(a => {
+    let box = document.createElement("a-box");
+    box.setAttribute("color", a.color);
+    box.setAttribute("position", a.pos);
+    box.setAttribute("depth", "0.3");
 
-        box.addEventListener("click", () => {
-            if (a.correct) {
-                correctSound.play();
-                nextLevel();
-            } else {
-                wrongSound.play();
-                box.setAttribute("animation", 
-                    "property: rotation; to: 0 360 0; dur: 500");
-            }
-        });
-
-        container.appendChild(box);
-    });
-}
-
-/* ===============================
-   УРОВЕНЬ 2 — Радуга
-=================================*/
-function loadLevel2() {
-    clearLevel();
-    document.getElementById("question").innerText =
-        "Расположите цвета радуги в правильном порядке";
-
-    const colors = ["red","orange","yellow","green","blue","indigo","violet"];
-    let shuffled = colors.sort(() => Math.random() - 0.5);
-
-    shuffled.forEach((c, i) => {
-        let sphere = document.createElement("a-sphere");
-        sphere.setAttribute("color", c);
-        sphere.setAttribute("radius", "0.3");
-        sphere.setAttribute("position", `${i-3} 0.5 -3`);
-        sphere.setAttribute("draggable", true);
-
-        sphere.addEventListener("click", () => {
-            sphere.object3D.position.x += 0.5;
-        });
-
-        container.appendChild(sphere);
-    });
-
-    setTimeout(() => {
-        correctSound.play();
+    box.addEventListener("click", () => {
+      if (a.correct) {
         nextLevel();
-    }, 10000); // имитация проверки
+      } else {
+        box.setAttribute("animation",
+          "property: rotation; to: 0 360 0; dur: 500");
+      }
+    });
+
+    container.appendChild(box);
+  });
 }
 
-/* ===============================
-   УРОВЕНЬ 3 — Паззл облако
-=================================*/
+function loadLevel2() {
+  clearLevel();
+  document.getElementById("question").innerText =
+    "Нажмите сферы по порядку радуги";
+
+  const colors = ["red","orange","yellow","green","blue","indigo","violet"];
+  let index = 0;
+
+  colors.forEach((c, i) => {
+    let sphere = document.createElement("a-sphere");
+    sphere.setAttribute("color", c);
+    sphere.setAttribute("radius", "0.25");
+    sphere.setAttribute("position", `${i*0.5-1.5} 0 -2`);
+
+    sphere.addEventListener("click", () => {
+      if (colors[index] === c) {
+        index++;
+        sphere.setAttribute("visible", false);
+        if (index === colors.length) nextLevel();
+      }
+    });
+
+    container.appendChild(sphere);
+  });
+}
+
 function loadLevel3() {
-    clearLevel();
-    document.getElementById("question").innerText =
-        "Соберите облако из частей";
+  clearLevel();
+  document.getElementById("question").innerText =
+    "Соберите облако";
 
-    for (let i = 1; i <= 3; i++) {
-        let piece = document.createElement("a-plane");
-        piece.setAttribute("src", `assets/cloud${i}.png`);
-        piece.setAttribute("position", `${i-2} 1 -3`);
-        piece.setAttribute("width", "1");
-        piece.setAttribute("height", "1");
+  for (let i = 0; i < 3; i++) {
+    let piece = document.createElement("a-box");
+    piece.setAttribute("color", "white");
+    piece.setAttribute("position", `${i-1} 0 -2`);
+    piece.setAttribute("scale", "0.6 0.4 0.2");
 
-        piece.addEventListener("click", () => {
-            piece.object3D.position.x = 0;
-            piece.object3D.position.y = 1;
-        });
+    piece.addEventListener("click", () => {
+      piece.object3D.position.x = 0;
+    });
 
-        container.appendChild(piece);
-    }
-
-    setTimeout(() => {
-        correctSound.play();
-        alert("Облако собрано ☁");
-    }, 10000);
+    container.appendChild(piece);
+  }
 }
-
-loadLevel1();

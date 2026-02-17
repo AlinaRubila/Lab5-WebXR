@@ -1,9 +1,10 @@
-#ui {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    color: white;
-    background: rgba(0,0,0,0.6);
-    padding: 10px;
-    border-radius: 10px;
-}
+ body { margin: 0; overflow: hidden; }
+    #ui {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      background: rgba(0,0,0,0.6);
+      padding: 10px;
+      border-radius: 10px;
+      z-index: 10;
