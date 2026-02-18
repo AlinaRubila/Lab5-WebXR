@@ -45,11 +45,26 @@ function animate() {
 }
 animate();
 
-window.addEventListener("pointerdown", event => {
-  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+renderer.domElement.addEventListener("pointerdown", event => {
 
-  raycaster.setFromCamera(mouse, camera);
+  event.preventDefault();
+
+  const rect = renderer.domElement.getBoundingClientRect();
+
+  const mouseX = (event.clientX - rect.left) / rect.width;
+  const mouseY = (event.clientY - rect.top) / rect.height;
+
+  const worldX = camera.left + mouseX * (camera.right - camera.left);
+  const worldY = camera.top - mouseY * (camera.top - camera.bottom);
+
+  raycaster.setFromCamera(
+    new THREE.Vector2(
+      mouseX * 2 - 1,
+      -(mouseY * 2 - 1)
+    ),
+    camera
+  );
+
   const intersects = raycaster.intersectObjects(objects);
 
   if (intersects.length > 0) {
@@ -57,17 +72,19 @@ window.addEventListener("pointerdown", event => {
 
     if (obj.userData.draggable) {
       draggable = obj;
-    } else if (obj.userData.correct) {
+      renderer.domElement.setPointerCapture(event.pointerId);
+    }
+    else if (obj.userData.correct) {
       correctSound.play();
       nextLevel();
     }
-    else if (!obj.userData.correct){
+    else {
       wrongSound.play();
     }
   }
 });
 
-window.addEventListener("pointermove", event => {
+renderer.domElement.addEventListener("pointermove", event => {
   if (!draggable) return;
 
   const rect = renderer.domElement.getBoundingClientRect();
@@ -82,7 +99,12 @@ window.addEventListener("pointermove", event => {
   draggable.position.y = worldY;
 });
 
-window.addEventListener("pointerup", () => {
+renderer.domElement.addEventListener("pointerup", event => {
+  draggable = null;
+  renderer.domElement.releasePointerCapture(event.pointerId);
+});
+
+renderer.domElement.addEventListener("pointercancel", () => {
   draggable = null;
 });
 

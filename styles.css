@@ -13,7 +13,12 @@ video {
   object-fit:cover;
   z-index:-1;
 }
-
+canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  touch-action: none;
+}
 
 #ui {
   position:fixed;
