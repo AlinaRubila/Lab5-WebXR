@@ -20,9 +20,7 @@ const camera = new THREE.OrthographicCamera(
   0.1,
   1000
 );
-
 camera.position.z = 10;
-
 const renderer = new THREE.WebGLRenderer({ alpha:true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.domElement.style.position = "fixed";
@@ -30,7 +28,6 @@ renderer.domElement.style.top = "0";
 renderer.domElement.style.left = "0";
 document.body.appendChild(renderer.domElement);
 
-camera.position.z = 5;
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
@@ -75,10 +72,14 @@ window.addEventListener("pointermove", event => {
 
   const rect = renderer.domElement.getBoundingClientRect();
 
-  const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-  draggable.position.x = x * (camera.right);
-  draggable.position.y = y * (camera.top);
+  const mouseX = (event.clientX - rect.left) / rect.width;
+  const mouseY = (event.clientY - rect.top) / rect.height;
+
+  const worldX = camera.left + mouseX * (camera.right - camera.left);
+  const worldY = camera.top - mouseY * (camera.top - camera.bottom);
+
+  draggable.position.x = worldX;
+  draggable.position.y = worldY;
 });
 
 window.addEventListener("pointerup", () => {
