@@ -70,7 +70,7 @@ function loadLevel2() {
   document.getElementById("question").innerText =
     "Нажимайте цвета радуги по порядку";
 
-  const colors = ["red","orange","yellow","green","blue","indigo","violet"];
+  const colors = ["red","orange","yellow","green","cyan","blue","indigo"];
   rainbowIndex = 0;
 
   objects = colors.map((c,i) => ({
