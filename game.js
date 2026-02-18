@@ -188,7 +188,7 @@ function checkRainbow(){
   if (filledSlots.length != 7) return;
   let correct = true;
   for (let i = 0; i < 7; i++) {
-    if (!rainbowSlots[i].filledBy || rainbowSlots[i].filledBy.userData.colorValue !== rainbowOrder[i]) {
+    if (!rainbowSlots[i].filledBy || rainbowSlots[i].filledBy.userData.colorValue !== rainbowColors[i]) {
       correct = false;
       break;
     }
