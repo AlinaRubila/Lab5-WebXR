@@ -1,96 +1,104 @@
-let scene = document.querySelector("a-scene");
-let container = document.querySelector("#levelContainer");
+const video = document.getElementById("camera");
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
 let currentLevel = 1;
+let objects = [];
+let rainbowIndex = 0;
 
-scene.addEventListener("enter-vr", () => {
-  if (scene.is("ar-mode")) {
-    console.log("AR started");
-    loadLevel1();
-  }
-});
-
-function clearLevel() {
-  container.innerHTML = "";
-}
-
-function nextLevel() {
-  currentLevel++;
-  if (currentLevel === 2) loadLevel2();
-  else if (currentLevel === 3) loadLevel3();
-  else alert("Квест завершён 🎉");
-}
-
-function loadLevel1() {
-  clearLevel();
+navigator.mediaDevices.getUserMedia({ video: true })
+.then(stream => {
+  video.srcObject = stream;
   document.getElementById("question").innerText =
     "Какой цвет получается при смешении красного и синего?";
+  loadLevel1();
+})
+.catch(err => {
+  alert("Нет доступа к камере");
+});
 
-  const answers = [
-    { color: "purple", correct: true, pos: "-0.5 0 -2" },
-    { color: "green", correct: false, pos: "0.5 0 -2" },
-    { color: "yellow", correct: false, pos: "1.5 0 -2" }
-  ];
+function draw() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  answers.forEach(a => {
-    let box = document.createElement("a-box");
-    box.setAttribute("color", a.color);
-    box.setAttribute("position", a.pos);
-    box.setAttribute("depth", "0.3");
-
-    box.addEventListener("click", () => {
-      if (a.correct) {
-        nextLevel();
-      } else {
-        box.setAttribute("animation",
-          "property: rotation; to: 0 360 0; dur: 500");
-      }
-    });
-
-    container.appendChild(box);
+  objects.forEach(obj => {
+    ctx.fillStyle = obj.color;
+    ctx.beginPath();
+    ctx.arc(obj.x, obj.y, obj.r, 0, Math.PI*2);
+    ctx.fill();
   });
+
+  requestAnimationFrame(draw);
+}
+draw();
+
+canvas.addEventListener("click", e => {
+  let rect = canvas.getBoundingClientRect();
+  let mx = e.clientX - rect.left;
+  let my = e.clientY - rect.top;
+
+  objects.forEach(obj => {
+    let dist = Math.hypot(mx-obj.x, my-obj.y);
+    if (dist < obj.r) obj.onClick();
+  });
+});
+
+function loadLevel1() {
+  objects = [
+    makeCircle("purple", 200, 300, true),
+    makeCircle("green", 400, 300, false),
+    makeCircle("yellow", 600, 300, false)
+  ];
+}
+
+function makeCircle(color, x, y, correct) {
+  return {
+    color, x, y, r:40,
+    onClick: function() {
+      if (correct) nextLevel();
+    }
+  }
 }
 
 function loadLevel2() {
-  clearLevel();
+  document.getElementById("levelTitle").innerText = "Уровень 2";
   document.getElementById("question").innerText =
-    "Нажмите сферы по порядку радуги";
+    "Нажимайте цвета радуги по порядку";
 
   const colors = ["red","orange","yellow","green","blue","indigo","violet"];
-  let index = 0;
+  rainbowIndex = 0;
 
-  colors.forEach((c, i) => {
-    let sphere = document.createElement("a-sphere");
-    sphere.setAttribute("color", c);
-    sphere.setAttribute("radius", "0.25");
-    sphere.setAttribute("position", `${i*0.5-1.5} 0 -2`);
-
-    sphere.addEventListener("click", () => {
-      if (colors[index] === c) {
-        index++;
-        sphere.setAttribute("visible", false);
-        if (index === colors.length) nextLevel();
+  objects = colors.map((c,i) => ({
+    color:c,
+    x:150+i*90,
+    y:300,
+    r:30,
+    onClick:function(){
+      if(colors[rainbowIndex]===c){
+        this.r=0;
+        rainbowIndex++;
+        if(rainbowIndex===colors.length) nextLevel();
       }
-    });
-
-    container.appendChild(sphere);
-  });
+    }
+  }));
 }
 
 function loadLevel3() {
-  clearLevel();
-  document.getElementById("question").innerText =
-    "Соберите облако";
+  document.getElementById("levelTitle").innerText = "Уровень 3";
+  document.getElementById("question").innerText = "Соберите облако";
 
-  for (let i = 0; i < 3; i++) {
-    let piece = document.createElement("a-box");
-    piece.setAttribute("color", "white");
-    piece.setAttribute("position", `${i-1} 0 -2`);
-    piece.setAttribute("scale", "0.6 0.4 0.2");
+  objects = [
+    makeCircle("white",200,350,false),
+    makeCircle("white",350,300,false),
+    makeCircle("white",500,350,false)
+  ];
+}
 
-    piece.addEventListener("click", () => {
-      piece.object3D.position.x = 0;
-    });
-
-    container.appendChild(piece);
-  }
+function nextLevel(){
+  currentLevel++;
+  if(currentLevel===2) loadLevel2();
+  else if(currentLevel===3) loadLevel3();
+  else alert("Квест завершён 🎉");
 }

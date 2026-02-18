@@ -1,10 +1,34 @@
- body { margin: 0; overflow: hidden; }
-    #ui {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      color: white;
-      background: rgba(0,0,0,0.6);
-      padding: 10px;
-      border-radius: 10px;
-      z-index: 10;
+body {
+  margin:0;
+  overflow:hidden;
+  background:black;
+}
+
+video {
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  z-index:-1;
+}
+
+canvas {
+  position:fixed;
+  top:0;
+  left:0;
+}
+
+#ui {
+  position:fixed;
+  top:10px;
+  left:10px;
+  background:rgba(0,0,0,0.6);
+  color:white;
+  padding:10px;
+  border-radius:10px;
+}
+button {
+  margin-top:5px;
+}
