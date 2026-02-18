@@ -1,7 +1,11 @@
 import * as THREE from 'three';
 
 const video = document.getElementById("camera");
-
+let rainbowSlots = [];
+const rainbowColors = [
+    0xff0000,0xff7f00,0xffff00,
+    0x00ff00,0x00bbff,0x0000ff,0x9400d3
+  ];
 navigator.mediaDevices.getUserMedia({
   video: { facingMode: "environment" }
 })
@@ -100,6 +104,17 @@ renderer.domElement.addEventListener("pointermove", event => {
 });
 
 renderer.domElement.addEventListener("pointerup", event => {
+  if (!draggable) return;
+  rainbowSlots.forEach(slot => {
+  const dist = Math.abs(draggable.position.x - slot.x);
+  if (dist < 0.5 && !slot.filledBy) {
+      draggable.position.x = slot.x;
+      draggable.position.y = slot.y;
+      slot.filledBy = draggable;
+    }
+  });
+  checkRainbow();
+
   draggable = null;
   renderer.domElement.releasePointerCapture(event.pointerId);
 });
@@ -142,26 +157,49 @@ function loadLevel2() {
   document.getElementById("levelTitle").innerText="Уровень 2";
   document.getElementById("question").innerText= "Составьте правильный порядок радуги";
 
-  const colors = [
-    0xff0000,0xff7f00,0xffff00,
-    0x00ff00,0x00bbff,0x0000ff,0x9400d3
-  ];
-
-  colors.forEach((c,i)=>{
+  rainbowSlots = [];
+  for (let i = 0; i < 7; i++) {
+    const slotX = -3 + i;
+    rainbowSlots.push({
+      x: slotX,
+      y: -2,
+      filledBy: null
+    });
+  const slotGeo = new THREE.CircleGeometry(0.45, 32);
+  const slotMat = new THREE.MeshBasicMaterial({color: 0xffffff, wireframe: true});
+  const slotMesh = new THREE.Mesh(slotGeo, slotMat);
+  slotMesh.position.set(slotX, -2, 0);
+  scene.add(slotMesh);
+  }
+  rainbowColors.forEach((color,i)=>{
     const geo = new THREE.SphereGeometry(0.4);
-    const mat = new THREE.MeshBasicMaterial({color:c});
+    const mat = new THREE.MeshBasicMaterial({color});
     const sphere = new THREE.Mesh(geo,mat);
-
-    sphere.position.set((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4, 0);
-    sphere.userData.draggable=true;
-
+    sphere.position.set((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 2 + 1, 0);
+    sphere.userData.draggable = true;
+    sphere.userData.colorValue = color;
     scene.add(sphere);
     objects.push(sphere);
   });
-
-  setTimeout(()=>nextLevel(),15000);
 }
 
+function checkRainbow(){
+  const filledSlots = rainbowSlots.filter(s => s.filledBy !== null);
+  if (filledSlots.length != 7) return;
+  let correct = true;
+  for (let i = 0; i < 7; i++) {
+    if (!rainbowSlots[i].filledBy || rainbowSlots[i].filledBy.userData.colorValue !== rainbowOrder[i]) {
+      correct = false;
+      break;
+    }
+  }
+  if (correct) {
+    correctSound.play();
+    setTimeout(()=>nextLevel(),1000);
+  } else {
+    wrongSound.play();
+  }
+}
 function loadLevel3() {
   clearScene();
   document.getElementById("levelTitle").innerText="Уровень 3";
