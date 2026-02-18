@@ -9,12 +9,19 @@ navigator.mediaDevices.getUserMedia({
 .catch(() => alert("Нет доступа к камере"));
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(
-  70,
-  window.innerWidth / window.innerHeight,
+const aspect = window.innerWidth / window.innerHeight;
+const frustumSize = 10;
+
+const camera = new THREE.OrthographicCamera(
+  frustumSize * aspect / -2,
+  frustumSize * aspect / 2,
+  frustumSize / 2,
+  frustumSize / -2,
   0.1,
   1000
 );
+
+camera.position.z = 10;
 
 const renderer = new THREE.WebGLRenderer({ alpha:true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -70,17 +77,8 @@ window.addEventListener("pointermove", event => {
 
   const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-  const vector = new THREE.Vector3(x, y, 0.5);
-  vector.unproject(camera);
-
-  const dir = vector.sub(camera.position).normalize();
-  const distance = -camera.position.z / dir.z;
-
-  const pos = camera.position.clone().add(dir.multiplyScalar(distance));
-
-  draggable.position.x = pos.x;
-  draggable.position.y = pos.y;
+  draggable.position.x = x * (camera.right);
+  draggable.position.y = y * (camera.top);
 });
 
 window.addEventListener("pointerup", () => {
@@ -119,8 +117,7 @@ function loadLevel1() {
 function loadLevel2() {
   clearScene();
   document.getElementById("levelTitle").innerText="Уровень 2";
-  document.getElementById("question").innerText=
-    "Перетащите цвета в правильном порядке";
+  document.getElementById("question").innerText= "Составьте правильный порядок радуги";
 
   const colors = [
     0xff0000,0xff7f00,0xffff00,
@@ -132,7 +129,7 @@ function loadLevel2() {
     const mat = new THREE.MeshBasicMaterial({color:c});
     const sphere = new THREE.Mesh(geo,mat);
 
-    sphere.position.set((Math.random()*6-3),2-Math.random()*2,0);
+    sphere.position.set((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4, 0);
     sphere.userData.draggable=true;
 
     scene.add(sphere);
@@ -164,7 +161,7 @@ function loadLevel3() {
       });
       const plane = new THREE.Mesh(geo,mat);
 
-      plane.position.set((i-1)*2,Math.random()*2-1,0);
+      plane.position.set((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4, 0);
       plane.userData.draggable=true;
 
       scene.add(plane);
