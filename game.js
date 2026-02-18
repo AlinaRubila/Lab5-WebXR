@@ -9,7 +9,7 @@ let currentLevel = 1;
 let objects = [];
 let rainbowIndex = 0;
 
-navigator.mediaDevices.getUserMedia({ video: true })
+navigator.mediaDevices.getUserMedia({ video: {facingMode: "environment"} })
 .then(stream => {
   video.srcObject = stream;
   document.getElementById("question").innerText =
@@ -46,10 +46,13 @@ canvas.addEventListener("click", e => {
 });
 
 function loadLevel1() {
+  const w = canvas.width;
+  const h = canvas.height;
+
   objects = [
-    makeCircle("purple", 200, 300, true),
-    makeCircle("green", 400, 300, false),
-    makeCircle("yellow", 600, 300, false)
+    makeCircle("purple", w*0.3, h*0.6, true),
+    makeCircle("green", w*0.5, h*0.6, false),
+    makeCircle("yellow", w*0.7, h*0.6, false)
   ];
 }
 
@@ -72,8 +75,8 @@ function loadLevel2() {
 
   objects = colors.map((c,i) => ({
     color:c,
-    x:150+i*90,
-    y:300,
+    x: canvas.width*0.1 + i*(canvas.width*0.1),
+    y: canvas.height*0.6,
     r:30,
     onClick:function(){
       if(colors[rainbowIndex]===c){
