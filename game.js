@@ -1,102 +1,177 @@
-const video = document.getElementById("camera");
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+import * as THREE from 'three';
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+// ------------------- Камера -------------------
+const video = document.getElementById("camera");
+
+navigator.mediaDevices.getUserMedia({
+  video: { facingMode: "environment" }
+})
+.then(stream => video.srcObject = stream)
+.catch(() => alert("Нет доступа к камере"));
+
+// ------------------- Three.js -------------------
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(
+  70,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
+
+const renderer = new THREE.WebGLRenderer({ alpha:true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.domElement.style.position = "fixed";
+renderer.domElement.style.top = "0";
+renderer.domElement.style.left = "0";
+document.body.appendChild(renderer.domElement);
+
+camera.position.z = 5;
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let draggable = null;
 
 let currentLevel = 1;
 let objects = [];
-let rainbowIndex = 0;
 
-navigator.mediaDevices.getUserMedia({ video: {facingMode: "environment"} })
-.then(stream => {
-  video.srcObject = stream;
-  document.getElementById("question").innerText =
-    "Какой цвет получается при смешении красного и синего?";
-  loadLevel1();
-})
-.catch(err => {
-  alert("Нет доступа к камере");
-});
+const correctSound = new Audio("sounds/correct.mp3");
 
-function draw() {
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  objects.forEach(obj => {
-    ctx.fillStyle = obj.color;
-    ctx.beginPath();
-    ctx.arc(obj.x, obj.y, obj.r, 0, Math.PI*2);
-    ctx.fill();
-  });
-
-  requestAnimationFrame(draw);
+// ------------------- Анимация -------------------
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
 }
-draw();
+animate();
 
-canvas.addEventListener("click", e => {
-  let rect = canvas.getBoundingClientRect();
-  let mx = e.clientX - rect.left;
-  let my = e.clientY - rect.top;
+// ------------------- Клик -------------------
+window.addEventListener("pointerdown", event => {
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-  objects.forEach(obj => {
-    let dist = Math.hypot(mx-obj.x, my-obj.y);
-    if (dist < obj.r) obj.onClick();
-  });
-});
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(objects);
 
-function loadLevel1() {
-  const w = canvas.width;
-  const h = canvas.height;
+  if (intersects.length > 0) {
+    const obj = intersects[0].object;
 
-  objects = [
-    makeCircle("purple", w*0.3, h*0.6, true),
-    makeCircle("green", w*0.5, h*0.6, false),
-    makeCircle("yellow", w*0.7, h*0.6, false)
-  ];
-}
-
-function makeCircle(color, x, y, correct) {
-  return {
-    color, x, y, r:40,
-    onClick: function() {
-      if (correct) nextLevel();
+    if (obj.userData.draggable) {
+      draggable = obj;
+    } else if (obj.userData.correct) {
+      correctSound.play();
+      nextLevel();
     }
   }
+});
+
+window.addEventListener("pointermove", event => {
+  if (!draggable) return;
+
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const planeZ = new THREE.Plane(new THREE.Vector3(0,0,1), 0);
+  const intersectPoint = new THREE.Vector3();
+  raycaster.ray.intersectPlane(planeZ, intersectPoint);
+
+  draggable.position.copy(intersectPoint);
+});
+
+window.addEventListener("pointerup", () => {
+  draggable = null;
+});
+
+// ------------------- Очистка -------------------
+function clearScene() {
+  objects.forEach(obj => scene.remove(obj));
+  objects = [];
+}
+
+// ------------------- УРОВЕНЬ 1 -------------------
+function loadLevel1() {
+  clearScene();
+  document.getElementById("question").innerText =
+    "Какой цвет получается при смешении красного и синего?";
+
+  const colors = [
+    {color:0x800080, correct:true},
+    {color:0x00ff00, correct:false},
+    {color:0xffff00, correct:false}
+  ];
+
+  colors.forEach((c,i) => {
+    const geo = new THREE.BoxGeometry();
+    const mat = new THREE.MeshBasicMaterial({ color:c.color });
+    const cube = new THREE.Mesh(geo, mat);
+
+    cube.position.x = (i-1)*2;
+    cube.userData.correct = c.correct;
+
+    scene.add(cube);
+    objects.push(cube);
+  });
 }
 
 function loadLevel2() {
-  document.getElementById("levelTitle").innerText = "Уровень 2";
-  document.getElementById("question").innerText =
-    "Нажимайте цвета радуги по порядку";
+  clearScene();
+  document.getElementById("levelTitle").innerText="Уровень 2";
+  document.getElementById("question").innerText=
+    "Перетащите цвета в правильном порядке";
 
-  const colors = ["red","orange","yellow","green","cyan","blue","indigo"];
-  rainbowIndex = 0;
+  const colors = [
+    0xff0000,0xff7f00,0xffff00,
+    0x00ff00,0x00bbff,0x0000ff,0x9400d3
+  ];
 
-  objects = colors.map((c,i) => ({
-    color:c,
-    x: canvas.width*0.1 + i*(canvas.width*0.1),
-    y: canvas.height*0.6,
-    r:30,
-    onClick:function(){
-      if(colors[rainbowIndex]===c){
-        this.r=0;
-        rainbowIndex++;
-        if(rainbowIndex===colors.length) nextLevel();
-      }
-    }
-  }));
+  colors.forEach((c,i)=>{
+    const geo = new THREE.SphereGeometry(0.4);
+    const mat = new THREE.MeshBasicMaterial({color:c});
+    const sphere = new THREE.Mesh(geo,mat);
+
+    sphere.position.set((Math.random()*6-3),2-Math.random()*2,0);
+    sphere.userData.draggable=true;
+
+    scene.add(sphere);
+    objects.push(sphere);
+  });
+
+  setTimeout(()=>nextLevel(),15000);
 }
 
 function loadLevel3() {
-  document.getElementById("levelTitle").innerText = "Уровень 3";
-  document.getElementById("question").innerText = "Соберите облако";
+  clearScene();
+  document.getElementById("levelTitle").innerText="Уровень 3";
+  document.getElementById("question").innerText=
+    "Соберите облако";
 
-  objects = [
-    makeCircle("white",200,350,false),
-    makeCircle("white",350,300,false),
-    makeCircle("white",500,350,false)
+  const loader = new THREE.TextureLoader();
+  const textures = [
+    "assets/cloud1.png",
+    "assets/cloud2.png",
+    "assets/cloud3.png"
   ];
+
+  textures.forEach((path,i)=>{
+    loader.load(path, texture=>{
+      const geo = new THREE.PlaneGeometry(2,1.5);
+      const mat = new THREE.MeshBasicMaterial({
+        map:texture,
+        transparent:true
+      });
+      const plane = new THREE.Mesh(geo,mat);
+
+      plane.position.set((i-1)*2,Math.random()*2-1,0);
+      plane.userData.draggable=true;
+
+      scene.add(plane);
+      objects.push(plane);
+    });
+  });
+
+  setTimeout(()=>{
+    correctSound.play();
+    alert("Облако собрано");
+  },15000);
 }
 
 function nextLevel(){
@@ -105,3 +180,5 @@ function nextLevel(){
   else if(currentLevel===3) loadLevel3();
   else alert("Квест завершён 🎉");
 }
+
+loadLevel1();
