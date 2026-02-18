@@ -2,6 +2,8 @@ import * as THREE from 'three';
 
 const video = document.getElementById("camera");
 let rainbowSlots = [];
+let cloudSlots = [];
+
 const rainbowColors = [
     0xff0000,0xff7f00,0xffff00,
     0x00ff00,0x00bbff,0x0000ff,0x9400d3
@@ -106,15 +108,26 @@ renderer.domElement.addEventListener("pointerup", event => {
   if (!draggable) return;
   rainbowSlots.forEach(slot => {
   const dist = Math.abs(draggable.position.x - slot.x);
-  if (dist < 0.5 && !slot.filledBy) {
+  if (dist < 0.3 && !slot.filledBy) {
       draggable.position.x = slot.x;
       draggable.position.y = slot.y;
       slot.filledBy = draggable;
     }
-  else if (dist >= 0.5 && slot.filledBy == draggable) {slot.filledBy = null;}
+  else if (dist >= 0.3 && slot.filledBy == draggable) {slot.filledBy = null;}
   });
   checkRainbow();
-
+  cloudSlots.forEach(slot => {
+    const dx = draggable.position.x - slot.x;
+    const dy = draggable.position.y - slot.y;
+    const distance = Math.sqrt(dx*dx + dy*dy);
+    if (distance < 0.8 && !slot.filledBy) {
+      draggable.position.x = slot.x;
+      draggable.position.y = slot.y;
+      slot.filledBy = draggable;
+    }
+    else if (distance >= 0.8 && slot.filledBy == draggable) {slot.filledBy = null;}
+  });
+  checkCloud();
   draggable = null;
   renderer.domElement.releasePointerCapture(event.pointerId);
 });
@@ -202,41 +215,95 @@ function checkRainbow(){
   }
 }
 function loadLevel3() {
-  clearScene();
+   clearScene();
+
   document.getElementById("levelTitle").innerText="Уровень 3";
   document.getElementById("question").innerText=
     "Соберите облако";
 
+  cloudSlots = [];
+
   const loader = new THREE.TextureLoader();
+
   const textures = [
     "assets/cloud1.png",
     "assets/cloud2.png",
     "assets/cloud3.png"
   ];
 
-  textures.forEach((path,i)=>{
-    loader.load(path, texture=>{
-      const geo = new THREE.PlaneGeometry(2,1.5);
+  for (let i = 0; i < 3; i++) {
+    const slotX = 0;
+    const slotY = i - 1;
+
+    cloudSlots.push({
+      x: slotX,
+      y: slotY,
+      index: i,
+      filledBy: null
+    });
+
+    const slotGeo = new THREE.PlaneGeometry(2, 1.5);
+    const slotMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      wireframe: true
+    });
+    const slotMesh = new THREE.Mesh(slotGeo, slotMat);
+    slotMesh.position.set(slotX, slotY, 0);
+    scene.add(slotMesh);
+  }
+
+  textures.forEach((path, i) => {
+    loader.load(path, texture => {
+
+      const geo = new THREE.PlaneGeometry(2, 1.5);
       const mat = new THREE.MeshBasicMaterial({
-        map:texture,
-        transparent:true
+        map: texture,
+        transparent: true
       });
-      const plane = new THREE.Mesh(geo,mat);
 
-      plane.position.set((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4, 0);
-      plane.userData.draggable=true;
+      const piece = new THREE.Mesh(geo, mat);
 
-      scene.add(plane);
-      objects.push(plane);
+      piece.position.set(
+        (Math.random() - 0.5) * 6,
+        (Math.random() - 0.5) * 3 + 1,
+        0
+      );
+
+      piece.userData.draggable = true;
+      piece.userData.correctIndex = i;
+
+      scene.add(piece);
+      objects.push(piece);
     });
   });
-
-  setTimeout(()=>{
-    correctSound.play();
-    alert("Облако собрано");
-  },15000);
 }
 
+function checkCloud(){
+  const filled = cloudSlots.filter(s => s.filledBy !== null);
+
+  if (filled.length !== 3) return;
+
+  let correct = true;
+
+  for (let i = 0; i < cloudSlots.length; i++) {
+
+    const slot = cloudSlots[i];
+
+    if (!slot.filledBy || slot.filledBy.userData.correctIndex !== slot.index) {
+      correct = false;
+      break;
+    }
+  }
+  if (correct) {
+    correctSound.play();
+    setTimeout(()=>{
+      alert("Облако собрано правильно");
+      nextLevel();
+    }, 800);
+  } else {
+    wrongSound.play();
+  }
+}
 function nextLevel(){
   currentLevel++;
   if(currentLevel===2) loadLevel2();
