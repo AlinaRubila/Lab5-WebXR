@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 
-// ------------------- Камера -------------------
 const video = document.getElementById("camera");
 
 navigator.mediaDevices.getUserMedia({
@@ -9,7 +8,6 @@ navigator.mediaDevices.getUserMedia({
 .then(stream => video.srcObject = stream)
 .catch(() => alert("Нет доступа к камере"));
 
-// ------------------- Three.js -------------------
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(
   70,
@@ -35,15 +33,14 @@ let currentLevel = 1;
 let objects = [];
 
 const correctSound = new Audio("sounds/correct.mp3");
+const wrongSound = new Audio("sounds/wrong.mp3")
 
-// ------------------- Анимация -------------------
 function animate() {
   requestAnimationFrame(animate);
   renderer.render(scene, camera);
 }
 animate();
 
-// ------------------- Клик -------------------
 window.addEventListener("pointerdown", event => {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -60,34 +57,41 @@ window.addEventListener("pointerdown", event => {
       correctSound.play();
       nextLevel();
     }
+    else if (!obj.userData.correct){
+      wrongSound.play();
+    }
   }
 });
 
 window.addEventListener("pointermove", event => {
   if (!draggable) return;
 
-  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  const rect = renderer.domElement.getBoundingClientRect();
 
-  raycaster.setFromCamera(mouse, camera);
-  const planeZ = new THREE.Plane(new THREE.Vector3(0,0,1), 0);
-  const intersectPoint = new THREE.Vector3();
-  raycaster.ray.intersectPlane(planeZ, intersectPoint);
+  const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
-  draggable.position.copy(intersectPoint);
+  const vector = new THREE.Vector3(x, y, 0.5);
+  vector.unproject(camera);
+
+  const dir = vector.sub(camera.position).normalize();
+  const distance = -camera.position.z / dir.z;
+
+  const pos = camera.position.clone().add(dir.multiplyScalar(distance));
+
+  draggable.position.x = pos.x;
+  draggable.position.y = pos.y;
 });
 
 window.addEventListener("pointerup", () => {
   draggable = null;
 });
 
-// ------------------- Очистка -------------------
 function clearScene() {
   objects.forEach(obj => scene.remove(obj));
   objects = [];
 }
 
-// ------------------- УРОВЕНЬ 1 -------------------
 function loadLevel1() {
   clearScene();
   document.getElementById("question").innerText =
@@ -178,7 +182,7 @@ function nextLevel(){
   currentLevel++;
   if(currentLevel===2) loadLevel2();
   else if(currentLevel===3) loadLevel3();
-  else alert("Квест завершён 🎉");
+  else alert("Квест завершён");
 }
 
 loadLevel1();
