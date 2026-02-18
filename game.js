@@ -34,7 +34,6 @@ document.body.appendChild(renderer.domElement);
 
 
 const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
 let draggable = null;
 
 let currentLevel = 1;
@@ -112,6 +111,7 @@ renderer.domElement.addEventListener("pointerup", event => {
       draggable.position.y = slot.y;
       slot.filledBy = draggable;
     }
+  else if (dist >= 0.5 && slot.filledBy == draggable) {slot.filledBy = null;}
   });
   checkRainbow();
 
@@ -170,6 +170,7 @@ function loadLevel2() {
   const slotMesh = new THREE.Mesh(slotGeo, slotMat);
   slotMesh.position.set(slotX, -2, 0);
   scene.add(slotMesh);
+  objects.push(slotMesh);
   }
   rainbowColors.forEach((color,i)=>{
     const geo = new THREE.SphereGeometry(0.4);
