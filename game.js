@@ -252,7 +252,17 @@ function loadLevel3() {
     loaderGLTF.load(path, gltf => {
 
       const model = gltf.scene;
-      model.position.set((index - 1) * 3, 0, 0);
+      const box = new THREE.Box3().setFromObject(model);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const desiredSize = 0.8;
+      const scale = desiredSize / maxDim;
+      model.scale.set(scale, scale, scale);
+      const spacing = 2;
+      const totalWidth = (modelPaths.length - 1) * spacing;
+      const startX = -totalWidth / 2;
+      model.position.set(startX + index * spacing, 0, 0);
       model.scale.set(1, 1, 1);
       model.userData.level3 = true;
       model.userData.colored = false;
