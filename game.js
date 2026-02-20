@@ -27,6 +27,8 @@ const camera = new THREE.OrthographicCamera(
   1000
 );
 camera.position.z = 10;
+const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
+scene.add(light);
 const renderer = new THREE.WebGLRenderer({ alpha:true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.domElement.style.position = "fixed";
