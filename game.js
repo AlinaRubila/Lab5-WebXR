@@ -1,8 +1,8 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const video = document.getElementById("camera");
 let rainbowSlots = [];
-let cloudSlots = [];
 
 const rainbowColors = [
     0xff0000,0xff7f00,0xffff00,
@@ -33,6 +33,18 @@ renderer.domElement.style.position = "fixed";
 renderer.domElement.style.top = "0";
 renderer.domElement.style.left = "0";
 document.body.appendChild(renderer.domElement);
+let rainbowStep = 0;
+let level3Objects = [];
+const loaderGLTF = new GLTFLoader();
+ const modelPaths = [
+    "assets/strawberry.glb",
+    "assets/orange.glb",
+    "assets/lemon.glb",
+    "assets/cactus.glb",
+    "assets/bottle.glb",
+    "assets/chair.glb",
+    "assets/eggplant.glb"
+  ];
 
 
 const raycaster = new THREE.Raycaster();
@@ -74,6 +86,31 @@ renderer.domElement.addEventListener("pointerdown", event => {
 
   if (intersects.length > 0) {
     const obj = intersects[0].object;
+    if (obj.userData.parentModel) {
+      const model = obj.userData.parentModel;
+      if (!model.userData.level3) return;
+      if (model.userData.colored) {
+        wrongSound.play();
+        return;
+      }
+      const expectedColor = rainbowColors[rainbowStep];
+      model.traverse(child => {
+        if (child.isMesh) {
+          child.material = child.material.clone();
+          child.material.color.setHex(expectedColor);
+        }
+      });
+      model.userData.colored = true;
+      rainbowStep++;
+      correctSound.play();
+      if (rainbowStep === level3Objects.length) {
+        setTimeout(() => {
+          alert("Все модели раскрашены правильно!");
+          nextLevel();
+        }, 800);
+      }
+      return;
+    }
 
     if (obj.userData.draggable) {
       draggable = obj;
@@ -116,18 +153,6 @@ renderer.domElement.addEventListener("pointerup", event => {
   else if (dist >= 0.3 && slot.filledBy == draggable) {slot.filledBy = null;}
   });
   checkRainbow();
-  cloudSlots.forEach(slot => {
-    const dx = draggable.position.x - slot.x;
-    const dy = draggable.position.y - slot.y;
-    const distance = Math.sqrt(dx*dx + dy*dy);
-    if (distance < 0.8 && !slot.filledBy) {
-      draggable.position.x = slot.x;
-      draggable.position.y = slot.y;
-      slot.filledBy = draggable;
-    }
-    else if (distance >= 0.8 && slot.filledBy == draggable) {slot.filledBy = null;}
-  });
-  checkCloud();
   draggable = null;
   renderer.domElement.releasePointerCapture(event.pointerId);
 });
@@ -215,95 +240,35 @@ function checkRainbow(){
   }
 }
 function loadLevel3() {
-   clearScene();
+  clearScene();
+  document.getElementById("levelTitle").innerText = "Уровень 3";
+  document.getElementById("question").innerText = "Нажмите на 3D-модели и раскрасьте их по порядку цветов радуги";
+  rainbowStep = 0;
+  level3Objects = [];
+  modelPaths.forEach((path, index) => {
 
-  document.getElementById("levelTitle").innerText="Уровень 3";
-  document.getElementById("question").innerText=
-    "Соберите облако";
+    loaderGLTF.load(path, gltf => {
 
-  cloudSlots = [];
+      const model = gltf.scene;
+      model.position.set((index - 1) * 3, 0, 0);
+      model.scale.set(1, 1, 1);
+      model.userData.level3 = true;
+      model.userData.colored = false;
+      model.userData.orderIndex = index;
 
-  const loader = new THREE.TextureLoader();
-
-  const textures = [
-    "assets/cloud1.png",
-    "assets/cloud2.png",
-    "assets/cloud3.png"
-  ];
-
-  for (let i = 0; i < 3; i++) {
-    const slotX = 0;
-    const slotY = i - 1;
-
-    cloudSlots.push({
-      x: slotX,
-      y: slotY,
-      index: i,
-      filledBy: null
-    });
-
-    const slotGeo = new THREE.PlaneGeometry(2, 1.5);
-    const slotMat = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      wireframe: true
-    });
-    const slotMesh = new THREE.Mesh(slotGeo, slotMat);
-    slotMesh.position.set(slotX, slotY, 0);
-    scene.add(slotMesh);
-  }
-
-  textures.forEach((path, i) => {
-    loader.load(path, texture => {
-
-      const geo = new THREE.PlaneGeometry(2, 1.5);
-      const mat = new THREE.MeshBasicMaterial({
-        map: texture,
-        transparent: true
+      model.traverse(child => {
+        if (child.isMesh) {
+          child.material = new THREE.MeshStandardMaterial({color: 0xffffff});
+          child.userData.parentModel = model;
+          objects.push(child);
+        }
       });
-
-      const piece = new THREE.Mesh(geo, mat);
-
-      piece.position.set(
-        (Math.random() - 0.5) * 6,
-        (Math.random() - 0.5) * 3 + 1,
-        0
-      );
-
-      piece.userData.draggable = true;
-      piece.userData.correctIndex = i;
-
-      scene.add(piece);
-      objects.push(piece);
+      scene.add(model);
+      level3Objects.push(model);
     });
   });
 }
 
-function checkCloud(){
-  const filled = cloudSlots.filter(s => s.filledBy !== null);
-
-  if (filled.length !== 3) return;
-
-  let correct = true;
-
-  for (let i = 0; i < cloudSlots.length; i++) {
-
-    const slot = cloudSlots[i];
-
-    if (!slot.filledBy || slot.filledBy.userData.correctIndex !== slot.index) {
-      correct = false;
-      break;
-    }
-  }
-  if (correct) {
-    correctSound.play();
-    setTimeout(()=>{
-      alert("Облако собрано правильно");
-      nextLevel();
-    }, 800);
-  } else {
-    wrongSound.play();
-  }
-}
 function nextLevel(){
   currentLevel++;
   if(currentLevel===2) loadLevel2();
