@@ -2,27 +2,22 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>AR Quest (Camera Overlay)</title>
-</head>
+<title>AR Quest (WebXR)</title>
 <link rel="stylesheet" href="styles.css">
- <script type="importmap">
-    {
-        "imports": {
-            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-        }
-    }
-    </script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
 <body>
-
-<video id="camera" autoplay playsinline></video>
-
 <div id="ui">
-  <h3 id="levelTitle">Уровень 1</h3>
-  <p id="question">Разрешите доступ к камере</p>
+  <h3 id="levelTitle">AR-Квест</h3>
+  <p id="question">Нажмите START AR и наведите на поверхность</p>
 </div>
-
 <script type="module" src="game.js"></script>
-
 </body>
 </html>

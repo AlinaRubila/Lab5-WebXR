@@ -1,44 +1,240 @@
 import * as THREE from 'three';
+import { ARButton } from 'three/addons/webxr/ARButton.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-const video = document.getElementById("camera");
-navigator.mediaDevices.getUserMedia({
-  video: { facingMode: "environment" }
-})
-.then(stream => video.srcObject = stream)
-.catch(() => alert("Нет доступа к камере"));
+let scene, camera, renderer, controller;
+let reticle;
+let hitTestSource = null;
+let hitTestSourceRequested = false;
 
-const scene = new THREE.Scene();
-const aspect = window.innerWidth / window.innerHeight;
-const frustumSize = 10;
-const camera = new THREE.OrthographicCamera(
-  frustumSize * aspect / -2,
-  frustumSize * aspect / 2,
-  frustumSize / 2,
-  frustumSize / -2,
-  0.1,
-  1000
-);
-camera.position.z = 10;
-const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
-scene.add(light);
-const renderer = new THREE.WebGLRenderer({ alpha:true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.domElement.style.position = "fixed";
-renderer.domElement.style.top = "0";
-renderer.domElement.style.left = "0";
-document.body.appendChild(renderer.domElement);
+let gameAnchor = null;
+let objects = [];
+let activePuzzle = null;
+let puzzleTriggerObject = null;
 
+let draggable = null;
 let rainbowSlots = [];
-
-const rainbowColors = [
-    0xff0000,0xff7f00,0xffff00,
-    0x00ff00,0x00bbff,0x0000ff,0x9400d3
-  ];
 let rainbowStep = 0;
 let level3Objects = [];
+
+let rainbowParticles = [];
+
 const loaderGLTF = new GLTFLoader();
- const modelPaths = [
+
+const rainbowColors = [
+  0xff0000,0xff7f00,0xffff00,
+  0x00ff00,0x00bbff,0x0000ff,0x9400d3
+];
+
+const correctSound = new Audio("sounds/correct.mp3");
+const wrongSound = new Audio("sounds/wrong.mp3");
+
+let puzzles = [
+  { id:1, color:0xff0000, x:-0.3 },
+  { id:2, color:0x00ff00, x:0 },
+  { id:3, color:0x0000ff, x:0.3 }
+];
+
+init();
+animate();
+
+function init() {
+
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
+
+  renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+  document.body.appendChild(renderer.domElement);
+
+  document.body.appendChild(
+    ARButton.createButton(renderer, { requiredFeatures:['hit-test'] })
+  );
+
+  const light = new THREE.HemisphereLight(0xffffff,0xbbbbff,1);
+  scene.add(light);
+
+  controller = renderer.xr.getController(0);
+  controller.addEventListener("select", onSelect);
+  controller.addEventListener("selectstart", onSelectStart);
+  controller.addEventListener("selectend", onSelectEnd);
+  scene.add(controller);
+
+  const geo = new THREE.RingGeometry(0.08,0.1,32);
+  geo.rotateX(-Math.PI/2);
+  reticle = new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:0x00ff00}));
+  reticle.matrixAutoUpdate=false;
+  reticle.visible=false;
+  scene.add(reticle);
+}
+
+function animate(){
+  renderer.setAnimationLoop(render);
+}
+
+function render(timestamp, frame){
+
+  if(frame){
+
+    const session = renderer.xr.getSession();
+    const refSpace = renderer.xr.getReferenceSpace();
+
+    if(!hitTestSourceRequested){
+      session.requestReferenceSpace('viewer').then(space=>{
+        session.requestHitTestSource({space}).then(source=>{
+          hitTestSource = source;
+        });
+      });
+
+      session.addEventListener("end",()=>{
+        hitTestSourceRequested=false;
+        hitTestSource=null;
+      });
+
+      hitTestSourceRequested=true;
+    }
+
+    if(hitTestSource){
+      const hits = frame.getHitTestResults(hitTestSource);
+      if(hits.length){
+        const pose = hits[0].getPose(refSpace);
+        reticle.visible=true;
+        reticle.matrix.fromArray(pose.transform.matrix);
+      } else {
+        reticle.visible=false;
+      }
+    }
+  }
+
+  updateParticles();
+  renderer.render(scene,camera);
+}
+
+function onSelect(){
+
+  if(!gameAnchor && reticle.visible){
+    gameAnchor = new THREE.Group();
+    gameAnchor.position.setFromMatrixPosition(reticle.matrix);
+    scene.add(gameAnchor);
+    loadWorld();
+    return;
+  }
+
+  if(!gameAnchor) return;
+
+  const raycaster = new THREE.Raycaster();
+  const tempMatrix = new THREE.Matrix4();
+  tempMatrix.identity().extractRotation(controller.matrixWorld);
+
+  raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+  raycaster.ray.direction.set(0,0,-1).applyMatrix4(tempMatrix);
+
+  const intersects = raycaster.intersectObjects(objects,true);
+
+  if(intersects.length){
+    const obj = intersects[0].object;
+
+    if(obj.userData.isPuzzleTrigger && !activePuzzle){
+      activePuzzle = obj.userData.puzzleId;
+      puzzleTriggerObject = obj;
+      clearLevel();
+
+      if(activePuzzle===1) loadLevel1();
+      if(activePuzzle===2) loadLevel2();
+      if(activePuzzle===3) loadLevel3();
+      return;
+    }
+
+    if(obj.userData.correct){
+      correctSound.play();
+      completePuzzle();
+    }
+
+    if(obj.userData.parentModel){
+      handleLevel3Click(obj.userData.parentModel);
+    }
+
+    if(obj.userData.draggable){
+      draggable=obj;
+    }
+  }
+}
+
+function onSelectStart(){}
+function onSelectEnd(){
+  if(draggable){
+    checkRainbow();
+    draggable=null;
+  }
+}
+
+function loadWorld(){
+
+  puzzles.forEach(p=>{
+    const cube=new THREE.Mesh(
+      new THREE.BoxGeometry(0.15,0.15,0.15),
+      new THREE.MeshStandardMaterial({color:p.color})
+    );
+    cube.position.set(p.x,0.15,-0.5);
+    cube.userData.isPuzzleTrigger=true;
+    cube.userData.puzzleId=p.id;
+    gameAnchor.add(cube);
+    objects.push(cube);
+  });
+}
+
+function loadLevel1(){
+  document.getElementById("question").innerText="Красный + Синий = ?";
+  const answers=[
+    {color:0x800080,correct:true},
+    {color:0x00ff00,correct:false},
+    {color:0xffff00,correct:false}
+  ];
+  answers.forEach((a,i)=>{
+    const cube=new THREE.Mesh(
+      new THREE.BoxGeometry(0.12,0.12,0.12),
+      new THREE.MeshStandardMaterial({color:a.color})
+    );
+    cube.position.set((i-1)*0.2,0.15,-0.5);
+    cube.userData.correct=a.correct;
+    gameAnchor.add(cube);
+    objects.push(cube);
+  });
+}
+
+function loadLevel2(){
+  document.getElementById("question").innerText="Соберите радугу";
+  rainbowSlots=[];
+  rainbowColors.forEach((c,i)=>{
+    const slotX=-0.5+i*0.17;
+    rainbowSlots.push({x:slotX,color:c,filled:null});
+    const sphere=new THREE.Mesh(
+      new THREE.SphereGeometry(0.05),
+      new THREE.MeshStandardMaterial({color:c})
+    );
+    sphere.position.set((Math.random()-0.5)*0.6,0.2,-0.4);
+    sphere.userData.draggable=true;
+    sphere.userData.colorValue=c;
+    gameAnchor.add(sphere);
+    objects.push(sphere);
+  });
+}
+
+function checkRainbow(){
+  let correct=true;
+  rainbowSlots.forEach((slot,i)=>{
+    if(!objects.find(o=>o.userData.colorValue===slot.color)){
+      correct=false;
+    }
+  });
+  if(correct) completePuzzle();
+}
+
+function loadLevel3(){
+  document.getElementById("question").innerText="Раскрасьте модели по порядку радуги";
+  rainbowStep=0;
+  const paths=[
     "assets/strawberry.glb",
     "assets/orange.glb",
     "assets/lemon.glb",
@@ -47,360 +243,10 @@ const loaderGLTF = new GLTFLoader();
     "assets/chair.glb",
     "assets/eggplant.glb"
   ];
-const correctSound = new Audio("sounds/correct.mp3");
-const wrongSound = new Audio("sounds/wrong.mp3")
 
-const raycaster = new THREE.Raycaster();
-let draggable = null;
-
-let objects = [];
-let activePuzzle = null;
-let puzzleTriggerObject = null; 
-let puzzles = [
-    { id: 1, color: 0xff0000, x: -4 },
-    { id: 2, color: 0x00ff00, x: 0 },
-    { id: 3, color: 0x0000ff, x: 4 }
-  ];
-let floatingObjects = [];
-
-function loadWorld() {
-  clearScene();
-  if (puzzles.length == 0){
-    document.getElementById("levelTitle").innerText = "AR-Квест";
-    document.getElementById("question").innerText = "Квест завершён!";
-    createRainbowExplosion(new THREE.Vector3(0, 0, 0));
-    return;
-  }
-  document.getElementById("levelTitle").innerText = "AR-Квест";
-  document.getElementById("question").innerText = "Найдите и нажмите на объект";
-  puzzles.forEach(p => {
-    const geo = new THREE.BoxGeometry(1.5,1.5,1.5);
-    const mat = new THREE.MeshStandardMaterial({ color: p.color });
-    const cube = new THREE.Mesh(geo, mat);
-    cube.position.set(p.x, 0, 0);
-    cube.userData.isPuzzleTrigger = true;
-    cube.userData.puzzleId = p.id;
-    scene.add(cube);
-    objects.push(cube);
-    floatingObjects.push(cube);
-  });
-}
-let particles = [];
-let rainbowParticles = [];
-
-function createParticles(position, color = 0xffffff) {
-  const count = 80;
-  const geometry = new THREE.BufferGeometry();
-  const positions = [];
-  const velocities = [];
-  for (let i = 0; i < count; i++) {
-    positions.push(position.x, position.y, position.z);
-    velocities.push(
-      (Math.random() - 0.5) * 0.2,
-      (Math.random() - 0.5) * 0.2,
-      (Math.random() - 0.5) * 0.2
-    );
-  }
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  const material = new THREE.PointsMaterial({
-    size: 0.4,
-    color: color,
-    transparent: true,
-    opacity: 1,
-    depthWrite: false,
-    depthTest: false
-  });
-  const points = new THREE.Points(geometry, material);
-  points.userData.velocities = velocities;
-  points.userData.life = 1;
-  scene.add(points);
-  particles.push(points);
-  console.log("Particles created", particles.length);
-}
-function createRainbowExplosion(position) {
-  const count = 300;
-  const geometry = new THREE.BufferGeometry();
-  const positions = [];
-  const velocities = [];
-  const colors = [];
-
-  for (let i = 0; i < count; i++) {
-    positions.push(position.x, position.y, position.z);
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 0.05 + Math.random() * 0.15;
-    velocities.push(
-      Math.cos(angle) * speed,
-      Math.sin(angle) * speed,
-      (Math.random() - 0.5) * 0.1
-    );
-    const rainbow = rainbowColors[Math.floor(Math.random() * rainbowColors.length)];
-    const color = new THREE.Color(rainbow);
-    colors.push(color.r, color.g, color.b);
-  }
-
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
-  const material = new THREE.PointsMaterial({
-    size: 0.8,
-    vertexColors: true,
-    transparent: true,
-    opacity: 1,
-    depthWrite: false,
-    depthTest: false,
-    blending: THREE.AdditiveBlending 
-  });
-
-  const points = new THREE.Points(geometry, material);
-  points.userData.velocities = velocities;
-  points.userData.life = 1;
-
-  scene.add(points);
-  rainbowParticles.push(points);
-  console.log("RAINBOW EXPLOSION!");
-}
-function animate() {
-  requestAnimationFrame(animate);
-  const time = Date.now() * 0.001;
-  floatingObjects.forEach((obj, i) => {
-    obj.position.y = Math.sin(time + i) * 0.3;
-    obj.rotation.y += 0.01;
-  });
-  level3Objects.forEach(obj => {
-  obj.rotation.y += 0.005;});
-  particles.forEach((p, index) => {
-  const positions = p.geometry.attributes.position.array;
-  const velocities = p.userData.velocities;
-  for (let i = 0; i < positions.length; i += 3) {
-    positions[i]     += velocities[i];
-    positions[i + 1] += velocities[i + 1];
-    positions[i + 2] += velocities[i + 2];
-  }
-  p.geometry.attributes.position.needsUpdate = true;
-  p.userData.life -= 0.01;
-  p.material.opacity = p.userData.life;
-  if (p.userData.life <= 0) {
-    scene.remove(p);
-    particles.splice(index, 1);
-  }
-});
-rainbowParticles.forEach((p, index) => {
-  const positions = p.geometry.attributes.position.array;
-  const velocities = p.userData.velocities;
-  for (let i = 0; i < positions.length; i += 3) {
-    positions[i]     += velocities[i];
-    positions[i + 1] += velocities[i + 1];
-    positions[i + 2] += velocities[i + 2];
-    velocities[i + 1] -= 0.003;
-  }
-  p.geometry.attributes.position.needsUpdate = true;
-  p.userData.life -= 0.005;
-  p.material.opacity = p.userData.life;
-  if (p.userData.life <= 0) {
-    scene.remove(p);
-    rainbowParticles.splice(index, 1);
-  }
-});
-  renderer.render(scene, camera);
-}
-animate();
-
-renderer.domElement.addEventListener("pointerdown", event => {
-
-  event.preventDefault();
-
-  const rect = renderer.domElement.getBoundingClientRect();
-
-  const mouseX = (event.clientX - rect.left) / rect.width;
-  const mouseY = (event.clientY - rect.top) / rect.height;
-
-  raycaster.setFromCamera(
-    new THREE.Vector2(
-      mouseX * 2 - 1,
-      -(mouseY * 2 - 1)
-    ),
-    camera
-  );
-
-  const intersects = raycaster.intersectObjects(objects);
-
-  if (intersects.length > 0) {
-    const obj = intersects[0].object;
-    if (obj.userData.isPuzzleTrigger && !activePuzzle) {
-      puzzleTriggerObject = obj;
-      activePuzzle = obj.userData.puzzleId;
-      clearScene();
-      if (activePuzzle === 1) loadLevel1();
-      else if (activePuzzle === 2) loadLevel2();
-      else if (activePuzzle === 3) loadLevel3();
-      return;
-    }
-    if (obj.userData.parentModel) {
-      const model = obj.userData.parentModel;
-      if (!model.userData.level3) return;
-      if (model.userData.colored) {
-        return;
-      }
-      const expectedColor = rainbowColors[rainbowStep];
-      if (expectedColor != model.userData.colorValue){
-        wrongSound.play();
-        return;
-      }
-      model.traverse(child => {
-        if (child.isMesh) {
-          child.material = child.material.clone();
-          child.material.color.setHex(expectedColor);
-        }
-      });
-      model.userData.colored = true;
-      rainbowStep++;
-      correctSound.play();
-      if (rainbowStep === level3Objects.length) {
-        setTimeout(() => {
-          completePuzzle();
-        }, 800);
-      }
-      return;
-    }
-
-    if (obj.userData.draggable) {
-      draggable = obj;
-      renderer.domElement.setPointerCapture(event.pointerId);
-    }
-    else if (obj.userData.correct) {
-      correctSound.play();
-      completePuzzle();
-    }
-    else {
-      wrongSound.play();
-    }
-  }
-});
-
-renderer.domElement.addEventListener("pointermove", event => {
-  if (!draggable) return;
-
-  const rect = renderer.domElement.getBoundingClientRect();
-
-  const mouseX = (event.clientX - rect.left) / rect.width;
-  const mouseY = (event.clientY - rect.top) / rect.height;
-
-  const worldX = camera.left + mouseX * (camera.right - camera.left);
-  const worldY = camera.top - mouseY * (camera.top - camera.bottom);
-
-  draggable.position.x = worldX;
-  draggable.position.y = worldY;
-});
-
-renderer.domElement.addEventListener("pointerup", event => {
-  if (!draggable) return;
-  rainbowSlots.forEach(slot => {
-  const dist = Math.abs(draggable.position.x - slot.x);
-  if (dist < 0.3 && !slot.filledBy) {
-      draggable.position.x = slot.x;
-      draggable.position.y = slot.y;
-      slot.filledBy = draggable;
-    }
-  else if (dist >= 0.3 && slot.filledBy == draggable) {slot.filledBy = null;}
-  });
-  checkRainbow();
-  draggable = null;
-  renderer.domElement.releasePointerCapture(event.pointerId);
-});
-
-renderer.domElement.addEventListener("pointercancel", () => {
-  draggable = null;
-});
-
-function clearScene() {
-  objects.forEach(obj => scene.remove(obj));
-  objects = [];
-  rainbowParticles.forEach(p => scene.remove(p));
-  rainbowParticles = [];
-
-  particles.forEach(p => scene.remove(p));
-  particles = [];
-}
-
-function loadLevel1() {
-  document.getElementById("question").innerText =
-    "Какой цвет получается при смешении красного и синего?";
-
-  const colors = [
-    {color:0x800080, correct:true},
-    {color:0x00ff00, correct:false},
-    {color:0xffff00, correct:false}
-  ];
-
-  colors.forEach((c,i) => {
-    const geo = new THREE.BoxGeometry();
-    const mat = new THREE.MeshBasicMaterial({ color:c.color });
-    const cube = new THREE.Mesh(geo, mat);
-
-    cube.position.x = (i-1)*2;
-    cube.userData.correct = c.correct;
-
-    scene.add(cube);
-    objects.push(cube);
-  });
-}
-
-function loadLevel2() {
-  document.getElementById("levelTitle").innerText="Уровень 2";
-  document.getElementById("question").innerText= "Составьте правильный порядок радуги";
-
-  rainbowSlots = [];
-  for (let i = 0; i < 7; i++) {
-    const slotX = -3 + i;
-    rainbowSlots.push({
-      x: slotX,
-      y: -2,
-      filledBy: null
-    });
-  const slotGeo = new THREE.CircleGeometry(0.45, 32);
-  const slotMat = new THREE.MeshBasicMaterial({color: 0xffffff, wireframe: true});
-  const slotMesh = new THREE.Mesh(slotGeo, slotMat);
-  slotMesh.position.set(slotX, -2, 0);
-  scene.add(slotMesh);
-  objects.push(slotMesh);
-  }
-  rainbowColors.forEach((color,i)=>{
-    const geo = new THREE.SphereGeometry(0.4);
-    const mat = new THREE.MeshBasicMaterial({color});
-    const sphere = new THREE.Mesh(geo,mat);
-    sphere.position.set((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 2 + 1, 0);
-    sphere.userData.draggable = true;
-    sphere.userData.colorValue = color;
-    scene.add(sphere);
-    objects.push(sphere);
-  });
-}
-
-function checkRainbow(){
-  const filledSlots = rainbowSlots.filter(s => s.filledBy !== null);
-  if (filledSlots.length != 7) return;
-  let correct = true;
-  for (let i = 0; i < 7; i++) {
-    if (!rainbowSlots[i].filledBy || rainbowSlots[i].filledBy.userData.colorValue !== rainbowColors[i]) {
-      correct = false;
-      break;
-    }
-  }
-  if (correct) {
-    setTimeout(()=>completePuzzle(),1000);
-  } else {
-    wrongSound.play();
-  }
-}
-function loadLevel3() {
-  document.getElementById("levelTitle").innerText = "Уровень 3";
-  document.getElementById("question").innerText = "Нажмите на 3D-модели и раскрасьте их по порядку цветов радуги";
-  rainbowStep = 0;
-  level3Objects = [];
-  modelPaths.forEach((path, index) => {
-
-    loaderGLTF.load(path, gltf => {
-
-      const model = gltf.scene;
+  paths.forEach((path,index)=>{
+    loaderGLTF.load(path,gltf=>{
+      const model=gltf.scene;
       const box = new THREE.Box3().setFromObject(model);
       const size = new THREE.Vector3();
       box.getSize(size);
@@ -411,41 +257,102 @@ function loadLevel3() {
       const rangeX = 6;
       const rangeY = 3;
       model.position.set((Math.random() - 0.5) * rangeX,(Math.random() - 0.5) * rangeY, 0);
-      model.rotation.y = Math.random() * Math.PI * 2;
-      model.rotation.x = (Math.random() - 0.5) * 0.4;
       model.rotation.z = (Math.random() - 0.5) * 0.4;
-      model.userData.level3 = true;
-      model.userData.colored = false;
-      model.userData.orderIndex = index;
-      model.userData.colorValue = rainbowColors[index]
-
-      model.traverse(child => {
-        if (child.isMesh) {
-          child.material = new THREE.MeshStandardMaterial({color: 0xffffff});
-          child.userData.parentModel = model;
+      model.userData.colorValue=rainbowColors[index];
+      model.userData.colored=false;
+      model.traverse(child=>{
+        if(child.isMesh){
+          child.material=new THREE.MeshStandardMaterial({color:0xffffff});
+          child.userData.parentModel=model;
           objects.push(child);
         }
       });
-      scene.add(model);
-      objects.push(model);
+      gameAnchor.add(model);
+      objects.push(model)
       level3Objects.push(model);
     });
   });
 }
 
-function completePuzzle() {
+function handleLevel3Click(model){
+  if(model.userData.colored) return;
+  const expected=rainbowColors[rainbowStep];
+  if(model.userData.colorValue!==expected){
+    wrongSound.play();
+    return;
+  }
+  model.traverse(c=>{
+    if(c.isMesh){
+      c.material.color.setHex(expected);
+    }
+  });
+  model.userData.colored=true;
+  rainbowStep++;
   correctSound.play();
-  const pos = puzzleTriggerObject.position.clone();
-  const color = puzzleTriggerObject.material.color.getHex();
-  createParticles(pos, color);
-  setTimeout(() => {
-    scene.remove(puzzleTriggerObject);
-    objects = objects.filter(o => o !== puzzleTriggerObject);
-    puzzles = puzzles.filter(p => p.id !== activePuzzle);
-    puzzleTriggerObject = null;
-    activePuzzle = null;
-    loadWorld();
-  }, 800);
+  if(rainbowStep===level3Objects.length){
+    setTimeout(()=>completePuzzle(),800);
+  }
 }
 
-loadWorld();
+function completePuzzle(){
+  correctSound.play();
+  createRainbowExplosion(new THREE.Vector3(0,0.2,-0.5));
+  setTimeout(()=>{
+    puzzles = puzzles.filter(p => p.id !== activePuzzle);
+    puzzleTriggerObject = null;
+    activePuzzle=null;
+    clearLevel();
+    loadWorld();
+  },1000);
+}
+
+function clearLevel(){
+  objects.forEach(o=>gameAnchor.remove(o));
+  objects=[];
+  level3Objects=[];
+  rainbowParticles.forEach(p => scene.remove(p));
+  rainbowParticles = [];
+}
+
+function createRainbowExplosion(position){
+  const geo=new THREE.BufferGeometry();
+  const count=200;
+  const pos=[];
+  const vel=[];
+  const col=[];
+  for(let i=0;i<count;i++){
+    pos.push(position.x,position.y,position.z);
+    const angle=Math.random()*Math.PI*2;
+    const speed=0.02+Math.random()*0.05;
+    vel.push(Math.cos(angle)*speed,Math.random()*0.05,Math.sin(angle)*speed);
+    const c=new THREE.Color(rainbowColors[Math.floor(Math.random()*7)]);
+    col.push(c.r,c.g,c.b);
+  }
+  geo.setAttribute("position",new THREE.Float32BufferAttribute(pos,3));
+  geo.setAttribute("color",new THREE.Float32BufferAttribute(col,3));
+  const mat=new THREE.PointsMaterial({size:0.03,vertexColors:true,transparent:true});
+  const points=new THREE.Points(geo,mat);
+  points.userData.vel=vel;
+  points.userData.life=1;
+  scene.add(points);
+  rainbowParticles.push(points);
+}
+
+function updateParticles(){
+  rainbowParticles.forEach((p,i)=>{
+    const pos=p.geometry.attributes.position.array;
+    const vel=p.userData.vel;
+    for(let j=0;j<pos.length;j+=3){
+      pos[j]+=vel[j];
+      pos[j+1]+=vel[j+1];
+      pos[j+2]+=vel[j+2];
+    }
+    p.geometry.attributes.position.needsUpdate=true;
+    p.userData.life-=0.01;
+    p.material.opacity=p.userData.life;
+    if(p.userData.life<=0){
+      scene.remove(p);
+      rainbowParticles.splice(i,1);
+    }
+  });
+}
