@@ -62,7 +62,6 @@ function create3DText(text) {
   gameAnchor.add(mesh);
 }
 function init() {
-  renderer.domElement.style.touchAction = "none";
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
 
@@ -70,7 +69,7 @@ function init() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.xr.enabled = true;
   document.body.appendChild(renderer.domElement);
-
+  renderer.domElement.style.touchAction = "none";
   document.body.appendChild(
     ARButton.createButton(renderer, { requiredFeatures:['hit-test'] })
   );
