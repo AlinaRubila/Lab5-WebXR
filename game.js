@@ -238,7 +238,7 @@ function onTouchStart(event) {
 
   const obj = intersects[0].object;
   if(!obj.userData.draggable) return;
-
+  create3DText("Перетаскиваем...")
   draggable = obj;
   isTouching = true;
   dragPlane = new THREE.Plane(
