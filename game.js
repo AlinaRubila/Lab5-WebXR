@@ -39,6 +39,25 @@ let puzzles = [
 init();
 animate();
 
+function create3DText(text) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 256;
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "white";
+  ctx.font = "40px sans-serif";
+  ctx.fillText(text, 20, 100);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const material = new THREE.MeshBasicMaterial({ map: texture });
+  const geometry = new THREE.PlaneGeometry(0.6, 0.3);
+
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.position.set(0, 0.6, -0.5);
+
+  gameAnchor.add(mesh);
+}
 function init() {
 
   scene = new THREE.Scene();
@@ -60,6 +79,9 @@ function init() {
   controller.addEventListener("select", onSelect);
   controller.addEventListener("selectstart", onSelectStart);
   controller.addEventListener("selectend", onSelectEnd);
+  renderer.domElement.addEventListener("touchstart", onTouchStart);
+  renderer.domElement.addEventListener("touchmove", onTouchMove);
+  renderer.domElement.addEventListener("touchend", onTouchEnd);
   scene.add(controller);
 
   const geo = new THREE.RingGeometry(0.08,0.1,32);
@@ -191,6 +213,57 @@ function onSelectEnd(){
   }
 }
 
+let isTouching = false;
+
+function getTouchIntersects(event) {
+  const touch = event.touches[0];
+  const rect = renderer.domElement.getBoundingClientRect();
+
+  const x = ( (touch.clientX - rect.left) / rect.width ) * 2 - 1;
+  const y = - ( (touch.clientY - rect.top) / rect.height ) * 2 + 1;
+
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera({x,y}, camera);
+
+  return raycaster.intersectObjects(objects, true);
+}
+
+function onTouchStart(event) {
+  const intersects = getTouchIntersects(event);
+  if(intersects.length){
+    const obj = intersects[0].object;
+    if(obj.userData.draggable){
+      draggable = obj;
+      isTouching = true;
+    }
+  }
+}
+
+function onTouchMove(event){
+  if(!draggable || !isTouching) return;
+
+  const touch = event.touches[0];
+  const rect = renderer.domElement.getBoundingClientRect();
+
+  const x = ( (touch.clientX - rect.left) / rect.width ) * 2 - 1;
+  const y = - ( (touch.clientY - rect.top) / rect.height ) * 2 + 1;
+
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera({x,y}, camera);
+
+  const dir = raycaster.ray.direction.clone().multiplyScalar(1);
+  const pos = raycaster.ray.origin.clone().add(dir);
+
+  draggable.position.lerp(pos, 0.5);
+}
+
+function onTouchEnd(){
+  if(draggable){
+    checkRainbow();
+  }
+  draggable = null;
+  isTouching = false;
+}
 function loadWorld(){
 
   puzzles.forEach(p=>{
@@ -207,6 +280,7 @@ function loadWorld(){
 }
 
 function loadLevel1(){
+  create3DText("Красный + Синий = ?");
   document.getElementById("question").innerText="Красный + Синий = ?";
   const answers=[
     {color:0x800080,correct:true},
@@ -226,6 +300,7 @@ function loadLevel1(){
 }
 
 function loadLevel2(){
+  create3DText("Соберите радугу");
   document.getElementById("question").innerText="Соберите радугу";
   rainbowSlots = [];
   rainbowColors.forEach((c,i)=>{
@@ -281,6 +356,7 @@ function checkRainbow(){
 }
 
 function loadLevel3(){
+  create3DText("Раскрасьте модели по порядку радуги");
   document.getElementById("question").innerText="Раскрасьте модели по порядку радуги";
   rainbowStep=0;
   const paths=[
