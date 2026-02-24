@@ -13,6 +13,7 @@ let activePuzzle = null;
 let puzzleTriggerObject = null;
 
 let draggable = null;
+const tempVec = new THREE.Vector3();
 let rainbowSlots = [];
 let rainbowStep = 0;
 let level3Objects = [];
@@ -108,6 +109,9 @@ function render(timestamp, frame){
   }
 
   updateParticles();
+  if(draggable){
+  tempVec.setFromMatrixPosition(controller.matrixWorld);
+  draggable.position.lerp(tempVec, 0.3);}
   renderer.render(scene,camera);
 }
 
@@ -161,11 +165,29 @@ function onSelect(){
   }
 }
 
-function onSelectStart(){}
+function onSelectStart(){
+
+  const raycaster = new THREE.Raycaster();
+  const tempMatrix = new THREE.Matrix4();
+  tempMatrix.identity().extractRotation(controller.matrixWorld);
+
+  raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+  raycaster.ray.direction.set(0,0,-1).applyMatrix4(tempMatrix);
+
+  const intersects = raycaster.intersectObjects(objects,true);
+
+  if(intersects.length){
+    const obj = intersects[0].object;
+    if(obj.userData.draggable){
+      draggable = obj;
+    }
+  }
+}
+
 function onSelectEnd(){
   if(draggable){
     checkRainbow();
-    draggable=null;
+    draggable = null;
   }
 }
 
@@ -281,10 +303,10 @@ function loadLevel3(){
       const desiredSize = 0.2;
       const scale = desiredSize / maxDim;
       model.scale.set(scale, scale, scale);
-      const rangeX = 0.8;
-      const rangeY = 0.5;
-      model.position.set((Math.random() - 0.5) * rangeX,(Math.random() - 0.5) * rangeY, 0);
-      model.rotation.z = (Math.random() - 0.5) * 0.4;
+      const radius = 0.5;
+      const angle = (index / paths.length) * Math.PI * 2;
+      model.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius - 0.5);
+      model.rotation.y = -angle;
       model.userData.colorValue=rainbowColors[index];
       model.userData.colored=false;
       model.traverse(child=>{
