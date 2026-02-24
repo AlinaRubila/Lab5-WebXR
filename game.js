@@ -145,12 +145,38 @@ function render(timestamp, frame){
     const newWorldPos = dragIntersect.clone().add(dragOffset);
     gameAnchor.worldToLocal(newWorldPos);
     draggable.position.copy(newWorldPos);
+    checkSlotIntersection(draggable); 
   }
 }
   }
 
   updateParticles();
   renderer.render(scene,camera);
+}
+function checkSlotIntersection(ball) {
+  const closestSlot = findClosestSlot(ball);
+  if (!closestSlot) return;
+  
+  const distance = ball.position.distanceTo(closestSlot.mesh.position);
+  if (distance <= 0.08) { // Допустимое расстояние для фиксации
+    ball.position.copy(closestSlot.mesh.position);
+    ball.userData.frozen = true; // Фиксируем позицию мяча
+  }
+}
+
+function findClosestSlot(ball) {
+  let minDistance = Infinity;
+  let closestSlot = null;
+  
+  rainbowSlots.forEach(slot => {
+    const dist = ball.position.distanceTo(slot.mesh.position);
+    if (dist < minDistance) {
+      minDistance = dist;
+      closestSlot = slot;
+    }
+  });
+  
+  return closestSlot;
 }
 
 function onSelect(){
