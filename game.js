@@ -82,9 +82,9 @@ function init() {
   controller.addEventListener("select", onSelect);
   controller.addEventListener("selectstart", onSelectStart);
   controller.addEventListener("selectend", onSelectEnd);
-  renderer.domElement.addEventListener("touchstart", onTouchStart);
-  renderer.domElement.addEventListener("touchmove", onTouchMove);
-  renderer.domElement.addEventListener("touchend", onTouchEnd);
+  //renderer.domElement.addEventListener("touchstart", onTouchStart);
+  //renderer.domElement.addEventListener("touchmove", onTouchMove);
+  //renderer.domElement.addEventListener("touchend", onTouchEnd);
   scene.add(controller);
 
   const geo = new THREE.RingGeometry(0.08,0.1,32);
@@ -131,6 +131,22 @@ function render(timestamp, frame){
         reticle.visible=false;
       }
     }
+    if(draggable && dragPlane){
+
+  const raycaster = new THREE.Raycaster();
+  const tempMatrix = new THREE.Matrix4();
+  tempMatrix.identity().extractRotation(controller.matrixWorld);
+
+  raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+  raycaster.ray.direction.set(0,0,-1).applyMatrix4(tempMatrix);
+
+  if(raycaster.ray.intersectPlane(dragPlane, dragIntersect)){
+
+    const newWorldPos = dragIntersect.clone().add(dragOffset);
+    gameAnchor.worldToLocal(newWorldPos);
+    draggable.position.copy(newWorldPos);
+  }
+}
   }
 
   updateParticles();
@@ -201,7 +217,19 @@ function onSelectStart(){
   if(intersects.length){
     const obj = intersects[0].object;
     if(obj.userData.draggable){
+
       draggable = obj;
+
+      const worldPos = new THREE.Vector3();
+      draggable.getWorldPosition(worldPos);
+
+      dragPlane = new THREE.Plane(
+        new THREE.Vector3(0,1,0),
+        -worldPos.y
+      );
+
+      raycaster.ray.intersectPlane(dragPlane, dragIntersect);
+      dragOffset.copy(worldPos).sub(dragIntersect);
     }
   }
 }
@@ -210,12 +238,13 @@ function onSelectEnd(){
   if(draggable){
     checkRainbow();
     draggable = null;
+    dragPlane = null;
   }
 }
 
 let isTouching = false;
 
-function getTouchIntersects(event) {
+/*function getTouchIntersects(event) {
   const touch = event.touches[0];
   const rect = renderer.domElement.getBoundingClientRect();
 
@@ -291,7 +320,7 @@ function onTouchEnd(){
   draggable = null;
   isTouching = false;
   dragPlane = null;
-}
+}*/
 function loadWorld(){
 
   puzzles.forEach(p=>{
