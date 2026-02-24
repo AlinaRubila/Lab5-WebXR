@@ -14,9 +14,6 @@ let puzzleTriggerObject = null;
 
 let draggable = null;
 const tempVec = new THREE.Vector3();
-let dragPlane = null;
-let dragOffset = new THREE.Vector3();
-let dragIntersect = new THREE.Vector3();
 let rainbowSlots = [];
 let rainbowStep = 0;
 let level3Objects = [];
@@ -62,6 +59,7 @@ function create3DText(text) {
   gameAnchor.add(mesh);
 }
 function init() {
+  renderer.domElement.style.touchAction = "none";
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
 
@@ -69,7 +67,7 @@ function init() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.xr.enabled = true;
   document.body.appendChild(renderer.domElement);
-  renderer.domElement.style.touchAction = "none";
+
   document.body.appendChild(
     ARButton.createButton(renderer, { requiredFeatures:['hit-test'] })
   );
@@ -228,47 +226,33 @@ function getTouchIntersects(event) {
 }
 
 function onTouchStart(event) {
-   event.preventDefault();
-
+  event.preventDefault();
   const intersects = getTouchIntersects(event);
-  if(!intersects.length) return;
-
-  const obj = intersects[0].object;
-  if(!obj.userData.draggable) return;
-
-  draggable = obj;
-  isTouching = true;
-  dragPlane = new THREE.Plane(
-    new THREE.Vector3(0,1,0),
-    -draggable.getWorldPosition(new THREE.Vector3()).y
-  );
-  const touch = event.touches[0];
-  const rect = renderer.domElement.getBoundingClientRect();
-
-  const x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
-  const y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
-
-  const raycaster = new THREE.Raycaster();
-  raycaster.setFromCamera({x,y}, camera);
-
-  raycaster.ray.intersectPlane(dragPlane, dragIntersect);
-  dragOffset.copy(draggable.position).sub(dragIntersect);
+  if(intersects.length){
+    const obj = intersects[0].object;
+    if(obj.userData.draggable){
+      draggable = obj;
+      isTouching = true;
+    }
+  }
 }
 
 function onTouchMove(event){
-   if(!draggable || !isTouching || !dragPlane) return;
+  if(!draggable || !isTouching) return;
 
   const touch = event.touches[0];
   const rect = renderer.domElement.getBoundingClientRect();
 
-  const x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
-  const y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
-
+  const x = ( (touch.clientX - rect.left) / rect.width ) * 2 - 1;
+  const y = - ( (touch.clientY - rect.top) / rect.height ) * 2 + 1;
   const raycaster = new THREE.Raycaster();
   raycaster.setFromCamera({x,y}, camera);
-
-  if(raycaster.ray.intersectPlane(dragPlane, dragIntersect)){
-    draggable.position.copy(dragIntersect.add(dragOffset));
+  const plane = new THREE.Plane(new THREE.Vector3(0,1,0), -draggable.position.y);
+  const intersectPoint = new THREE.Vector3();
+  raycaster.ray.intersectPlane(plane, intersectPoint);
+  if(intersectPoint){
+    draggable.position.x = intersectPoint.x;
+    draggable.position.z = intersectPoint.z;
   }
 }
 
@@ -278,7 +262,6 @@ function onTouchEnd(){
   }
   draggable = null;
   isTouching = false;
-  dragPlane = null;
 }
 function loadWorld(){
 
