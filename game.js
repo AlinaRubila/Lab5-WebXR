@@ -205,30 +205,57 @@ function loadLevel1(){
 
 function loadLevel2(){
   document.getElementById("question").innerText="Соберите радугу";
-  rainbowSlots=[];
+  rainbowSlots = [];
   rainbowColors.forEach((c,i)=>{
-    const slotX=-0.5+i*0.17;
-    rainbowSlots.push({x:slotX,color:c,filled:null});
-    const sphere=new THREE.Mesh(
+    const slotX = -0.5 + i*0.17;
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.06, 0.08, 32),
+      new THREE.MeshBasicMaterial({color:0xffffff, side:THREE.DoubleSide})
+    );
+    ring.rotation.x = -Math.PI/2;
+    ring.position.set(slotX,0.01,-0.5);
+
+    gameAnchor.add(ring);
+    objects.push(ring);
+
+    rainbowSlots.push({
+      x: slotX,
+      color: c,
+      filled: null,
+      mesh: ring
+    });
+    const sphere = new THREE.Mesh(
       new THREE.SphereGeometry(0.05),
       new THREE.MeshStandardMaterial({color:c})
     );
-    sphere.position.set((Math.random()-0.5)*0.6,0.2,-0.4);
-    sphere.userData.draggable=true;
-    sphere.userData.colorValue=c;
+
+    sphere.position.set(
+      (Math.random()-0.5)*0.6,
+      0.2,
+      -0.4
+    );
+
+    sphere.userData.draggable = true;
+    sphere.userData.colorValue = c;
+
     gameAnchor.add(sphere);
     objects.push(sphere);
   });
 }
 
 function checkRainbow(){
-  let correct=true;
-  rainbowSlots.forEach((slot,i)=>{
-    if(!objects.find(o=>o.userData.colorValue===slot.color)){
-      correct=false;
-    }
+  let correct = true;
+  rainbowSlots.forEach(slot => {
+    const sphere = objects.find(o =>
+      o.userData.draggable &&
+      o.userData.colorValue === slot.color &&
+      Math.abs(o.position.x - slot.x) < 0.08
+    );
+    if(!sphere){correct = false;}
   });
-  if(correct) completePuzzle();
+  if(correct){
+    completePuzzle();
+  }
 }
 
 function loadLevel3(){
@@ -251,11 +278,11 @@ function loadLevel3(){
       const size = new THREE.Vector3();
       box.getSize(size);
       const maxDim = Math.max(size.x, size.y, size.z);
-      const desiredSize = 1.5;
+      const desiredSize = 0.2;
       const scale = desiredSize / maxDim;
       model.scale.set(scale, scale, scale);
-      const rangeX = 6;
-      const rangeY = 3;
+      const rangeX = 0.8;
+      const rangeY = 0.5;
       model.position.set((Math.random() - 0.5) * rangeX,(Math.random() - 0.5) * rangeY, 0);
       model.rotation.z = (Math.random() - 0.5) * 0.4;
       model.userData.colorValue=rainbowColors[index];

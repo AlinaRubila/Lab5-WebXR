@@ -20,3 +20,16 @@ canvas {
   padding:10px;
   border-radius:10px;
 }
+#question {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: white;
+  font-size: 24px;
+  font-family: sans-serif;
+  background: rgba(0,0,0,0.5);
+  padding: 10px 20px;
+  border-radius: 10px;
+  z-index: 10;
+}
