@@ -253,10 +253,13 @@ function onTouchStart(event) {
 
   const raycaster = new THREE.Raycaster();
   const xrCamera = renderer.xr.getCamera(camera);
-  //raycaster.setFromCamera({x,y}, xrCamera);
-  raycaster.setFromCamera({x,y}, camera);
+  raycaster.setFromCamera({x,y}, xrCamera);
+  //raycaster.setFromCamera({x,y}, camera);
   raycaster.ray.intersectPlane(dragPlane, dragIntersect);
-  dragOffset.copy(draggable.position).sub(dragIntersect);
+  //dragOffset.copy(draggable.position).sub(dragIntersect);
+  const worldPos = new THREE.Vector3();
+  draggable.getWorldPosition(worldPos);
+  dragOffset.copy(worldPos).sub(dragIntersect);
 }
 
 function onTouchMove(event){
@@ -274,7 +277,10 @@ function onTouchMove(event){
   //raycaster.setFromCamera({x,y}, camera);
 
   if(raycaster.ray.intersectPlane(dragPlane, dragIntersect)){
-    draggable.position.copy(dragIntersect.add(dragOffset));
+    //draggable.position.copy(dragIntersect.add(dragOffset));
+    const newWorldPos = dragIntersect.clone().add(dragOffset);
+    gameAnchor.worldToLocal(newWorldPos);
+    draggable.position.copy(newWorldPos);
   }
 }
 
