@@ -17,6 +17,9 @@ const tempVec = new THREE.Vector3();
 let rainbowSlots = [];
 let rainbowStep = 0;
 let level3Objects = [];
+let dragPlane = null;
+let dragOffset = new THREE.Vector3();
+let dragIntersect = new THREE.Vector3();
 
 let rainbowParticles = [];
 
@@ -227,32 +230,45 @@ function getTouchIntersects(event) {
 
 function onTouchStart(event) {
   event.preventDefault();
+
   const intersects = getTouchIntersects(event);
-  if(intersects.length){
-    const obj = intersects[0].object;
-    if(obj.userData.draggable){
-      draggable = obj;
-      isTouching = true;
-    }
-  }
+  if(!intersects.length) return;
+
+  const obj = intersects[0].object;
+  if(!obj.userData.draggable) return;
+
+  draggable = obj;
+  isTouching = true;
+  dragPlane = new THREE.Plane(
+    new THREE.Vector3(0,1,0),
+    -draggable.getWorldPosition(new THREE.Vector3()).y
+  );
+  const touch = event.touches[0];
+  const rect = renderer.domElement.getBoundingClientRect();
+
+  const x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
+  const y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
+
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera({x,y}, camera);
+  raycaster.ray.intersectPlane(dragPlane, dragIntersect);
+  dragOffset.copy(draggable.position).sub(dragIntersect);
 }
 
 function onTouchMove(event){
-  if(!draggable || !isTouching) return;
+  if(!draggable || !isTouching || !dragPlane) return;
 
   const touch = event.touches[0];
   const rect = renderer.domElement.getBoundingClientRect();
 
-  const x = ( (touch.clientX - rect.left) / rect.width ) * 2 - 1;
-  const y = - ( (touch.clientY - rect.top) / rect.height ) * 2 + 1;
+  const x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
+  const y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
+
   const raycaster = new THREE.Raycaster();
   raycaster.setFromCamera({x,y}, camera);
-  const plane = new THREE.Plane(new THREE.Vector3(0,1,0), -draggable.position.y);
-  const intersectPoint = new THREE.Vector3();
-  raycaster.ray.intersectPlane(plane, intersectPoint);
-  if(intersectPoint){
-    draggable.position.x = intersectPoint.x;
-    draggable.position.z = intersectPoint.z;
+
+  if(raycaster.ray.intersectPlane(dragPlane, dragIntersect)){
+    draggable.position.copy(dragIntersect.add(dragOffset));
   }
 }
 
@@ -262,6 +278,7 @@ function onTouchEnd(){
   }
   draggable = null;
   isTouching = false;
+  dragPlane = null;
 }
 function loadWorld(){
 
