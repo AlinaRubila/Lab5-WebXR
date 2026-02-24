@@ -138,7 +138,6 @@ function render(timestamp, frame){
 }
 
 function onSelect(){
-  create3DText("onSelect")
 
   if(!gameAnchor && reticle.visible){
     gameAnchor = new THREE.Group();
@@ -189,7 +188,6 @@ function onSelect(){
 }
 
 function onSelectStart(){
-  create3DText("OnSelectStart")
 
   const raycaster = new THREE.Raycaster();
   const tempMatrix = new THREE.Matrix4();
@@ -209,7 +207,6 @@ function onSelectStart(){
 }
 
 function onSelectEnd(){
-  create3DText("OnSelectEnd")
   if(draggable){
     checkRainbow();
     draggable = null;
@@ -219,7 +216,6 @@ function onSelectEnd(){
 let isTouching = false;
 
 function getTouchIntersects(event) {
-  create3DText("GetTouchIntersects")
   const touch = event.touches[0];
   const rect = renderer.domElement.getBoundingClientRect();
 
@@ -239,7 +235,7 @@ function onTouchStart(event) {
 
   const intersects = getTouchIntersects(event);
   if(!intersects.length) return;
-  create3DText("OnTouchStart")
+
   const obj = intersects[0].object;
   if(!obj.userData.draggable) return;
   draggable = obj;
@@ -263,7 +259,6 @@ function onTouchStart(event) {
 }
 
 function onTouchMove(event){
-  create3DText("OnTouchMove")
   if(!draggable || !isTouching || !dragPlane) return;
 
   const touch = event.touches[0];
@@ -283,7 +278,6 @@ function onTouchMove(event){
 }
 
 function onTouchEnd(){
-  create3DText("OnTouchEnd")
   if(draggable){
     checkRainbow();
   }
