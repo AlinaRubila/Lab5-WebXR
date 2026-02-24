@@ -238,6 +238,7 @@ function onTouchStart(event) {
 
   const obj = intersects[0].object;
   if(!obj.userData.draggable) return;
+
   draggable = obj;
   isTouching = true;
   dragPlane = new THREE.Plane(
@@ -252,8 +253,8 @@ function onTouchStart(event) {
 
   const raycaster = new THREE.Raycaster();
   const xrCamera = renderer.xr.getCamera(camera);
-  raycaster.setFromCamera({x,y}, xrCamera);
-  //raycaster.setFromCamera({x,y}, camera);
+  //raycaster.setFromCamera({x,y}, xrCamera);
+  raycaster.setFromCamera({x,y}, camera);
   raycaster.ray.intersectPlane(dragPlane, dragIntersect);
   dragOffset.copy(draggable.position).sub(dragIntersect);
 }
