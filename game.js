@@ -62,7 +62,6 @@ function create3DText(text) {
   gameAnchor.add(mesh);
 }
 function init() {
-  renderer.domElement.style.touchAction = "none";
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
 
@@ -70,6 +69,7 @@ function init() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.xr.enabled = true;
   document.body.appendChild(renderer.domElement);
+  renderer.domElement.style.touchAction = "none";
 
   document.body.appendChild(
     ARButton.createButton(renderer, { requiredFeatures:['hit-test'] })
@@ -223,7 +223,9 @@ function getTouchIntersects(event) {
   const y = - ( (touch.clientY - rect.top) / rect.height ) * 2 + 1;
 
   const raycaster = new THREE.Raycaster();
-  raycaster.setFromCamera({x,y}, camera);
+  const xrCamera = renderer.xr.getCamera(camera);
+  raycaster.setFromCamera({x,y}, xrCamera);
+  //raycaster.setFromCamera({x,y}, camera);
 
   return raycaster.intersectObjects(objects, true);
 }
@@ -250,6 +252,8 @@ function onTouchStart(event) {
   const y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
 
   const raycaster = new THREE.Raycaster();
+  const xrCamera = renderer.xr.getCamera(camera);
+  //raycaster.setFromCamera({x,y}, xrCamera);
   raycaster.setFromCamera({x,y}, camera);
   raycaster.ray.intersectPlane(dragPlane, dragIntersect);
   dragOffset.copy(draggable.position).sub(dragIntersect);
@@ -265,7 +269,9 @@ function onTouchMove(event){
   const y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
 
   const raycaster = new THREE.Raycaster();
-  raycaster.setFromCamera({x,y}, camera);
+  const xrCamera = renderer.xr.getCamera(camera);
+  raycaster.setFromCamera({x,y}, xrCamera);
+  //raycaster.setFromCamera({x,y}, camera);
 
   if(raycaster.ray.intersectPlane(dragPlane, dragIntersect)){
     draggable.position.copy(dragIntersect.add(dragOffset));
@@ -451,7 +457,8 @@ function clearLevel(){
   objects.forEach(o=>gameAnchor.remove(o));
   objects=[];
   level3Objects=[];
-  rainbowParticles.forEach(p => scene.remove(p));
+  //rainbowParticles.forEach(p => scene.remove(p));
+  rainbowParticles.forEach(p => gameAnchor.remove(p));
   rainbowParticles = [];
 }
 
@@ -471,11 +478,12 @@ function createRainbowExplosion(position){
   }
   geo.setAttribute("position",new THREE.Float32BufferAttribute(pos,3));
   geo.setAttribute("color",new THREE.Float32BufferAttribute(col,3));
-  const mat=new THREE.PointsMaterial({size:0.03,vertexColors:true,transparent:true});
+  const mat=new THREE.PointsMaterial({size:0.03,vertexColors:true,transparent:true,  depthWrite: false});
   const points=new THREE.Points(geo,mat);
   points.userData.vel=vel;
   points.userData.life=1;
-  scene.add(points);
+  //scene.add(points);
+  gameAnchor.add(points);
   rainbowParticles.push(points);
 }
 
