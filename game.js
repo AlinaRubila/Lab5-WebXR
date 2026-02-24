@@ -41,7 +41,7 @@ animate();
 
 function create3DText(text) {
   const canvas = document.createElement("canvas");
-  canvas.width = 512;
+  canvas.width = 1024;
   canvas.height = 256;
   const ctx = canvas.getContext("2d");
 
@@ -59,7 +59,7 @@ function create3DText(text) {
   gameAnchor.add(mesh);
 }
 function init() {
-
+  renderer.domElement.style.touchAction = "none";
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
 
@@ -131,9 +131,6 @@ function render(timestamp, frame){
   }
 
   updateParticles();
-  if(draggable){
-  tempVec.setFromMatrixPosition(controller.matrixWorld);
-  draggable.position.lerp(tempVec, 0.3);}
   renderer.render(scene,camera);
 }
 
@@ -229,6 +226,7 @@ function getTouchIntersects(event) {
 }
 
 function onTouchStart(event) {
+  event.preventDefault();
   const intersects = getTouchIntersects(event);
   if(intersects.length){
     const obj = intersects[0].object;
@@ -247,14 +245,15 @@ function onTouchMove(event){
 
   const x = ( (touch.clientX - rect.left) / rect.width ) * 2 - 1;
   const y = - ( (touch.clientY - rect.top) / rect.height ) * 2 + 1;
-
   const raycaster = new THREE.Raycaster();
   raycaster.setFromCamera({x,y}, camera);
-
-  const dir = raycaster.ray.direction.clone().multiplyScalar(1);
-  const pos = raycaster.ray.origin.clone().add(dir);
-
-  draggable.position.lerp(pos, 0.5);
+  const plane = new THREE.Plane(new THREE.Vector3(0,1,0), -draggable.position.y);
+  const intersectPoint = new THREE.Vector3();
+  raycaster.ray.intersectPlane(plane, intersectPoint);
+  if(intersectPoint){
+    draggable.position.x = intersectPoint.x;
+    draggable.position.z = intersectPoint.z;
+  }
 }
 
 function onTouchEnd(){
